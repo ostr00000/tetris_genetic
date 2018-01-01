@@ -2,7 +2,6 @@ import socket
 import struct
 import logging
 import pickle
-import select
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -19,25 +18,26 @@ class MessageType:
 def send(msg, sock: socket.SocketType):
     msg = pickle.dumps(msg)
     val = struct.pack('!i', len(msg))
-    sock.sendall(val)
-    sock.sendall(msg)
+    try:
+        sock.sendall(val)
+        sock.sendall(msg)
+    except BrokenPipeError:
+        return
 
 
 def receive(sock: socket.SocketType):
-    read, _write, error = select.select([sock], [], [sock])
-    if error:
-        raise IOError("problem with socket")
-
     buf = b''
     while len(buf) < 4:
         chunk = sock.recv(4)
+        if not chunk:
+            raise IOError("socket connection broken")
         buf += chunk
     length = struct.unpack('!i', buf[:4])[0]
     bytes_recd = len(buf) - 4
 
     while bytes_recd < length:
         chunk = sock.recv(min(length - bytes_recd, 2048))
-        if chunk == '':
+        if not chunk:
             raise IOError("socket connection broken")
         buf += chunk
         bytes_recd = bytes_recd + len(chunk)

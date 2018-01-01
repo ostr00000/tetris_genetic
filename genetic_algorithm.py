@@ -1,8 +1,8 @@
-from tetris_ai import Parameters
+from tetris.tetris_ai import Parameters
 from random import random, randrange, uniform
 from typing import List, Tuple
-from multiporcess import parallel_map
-from server import Server
+from multiprocess_map import parallel_map_fun
+from python_socket_client_server.server import Server
 import pickle
 import logging
 import os
@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 old_filename = "old.genetic"
 
+DEFAULT_HOST, DEFAULT_PORT = 'localhost', 55055
+
 
 class GeneticAlgorithm:
     fit_types = {
@@ -19,6 +21,20 @@ class GeneticAlgorithm:
         "multi": 1,
         "socket": 2
     }
+
+    REQUIRED_DIR = [
+        "tetris/"
+    ]
+
+    REQUIRED_FILES = [
+        "multiprocess_map.py",
+        "multiprocess.py",
+        "candidate.py",
+        "tetris/__init__.py",
+        "tetris/tetris_ai.py",
+        "tetris/board.py",
+        "tetris/tetromino.py",
+    ]
 
     def __init__(self,
                  num_of_population: int,
@@ -28,7 +44,7 @@ class GeneticAlgorithm:
                  offsprings_num: int = 300,
                  mutation_chance: float = 0.05,
                  mutation_max_value: float = 0.2,
-                 load_files=True,
+                 load_files: bool = True,
                  fit_type: str = "multi"):
 
         assert num_of_population >= parents_num_in_tournament
@@ -51,7 +67,7 @@ class GeneticAlgorithm:
         if fit_type not in GeneticAlgorithm.fit_types:
             raise ValueError("wrong fit_type")
         else:
-            self.fit_type = fit_type
+            self.fit_type: int = GeneticAlgorithm.fit_types[fit_type]
 
         if fit_type == "socket":
             self._start_socket()
@@ -80,7 +96,7 @@ class GeneticAlgorithm:
 
         new_population = []
         for _ in range(self.num_of_population - len(self.population)):
-            new_population.append(Candidate())
+            new_population.append(Candidate(auto_save=self.load_files))
 
         self.population.extend(self._fit_all(new_population))
 
@@ -102,7 +118,6 @@ class GeneticAlgorithm:
 
         #  one computer one thread
         if self.fit_type == GeneticAlgorithm.fit_types["single"]:
-
             ret = []
             for i, candidate in enumerate(candidates):
                 ret.append(candidate.fit(self.games_number,
@@ -112,17 +127,19 @@ class GeneticAlgorithm:
 
         # one computer many threads
         elif self.fit_type == GeneticAlgorithm.fit_types["multi"]:
-            def map_function(candid: Candidate) -> Candidate:
-                return candid.fit(self.games_number,
-                                  self.tetrominos_in_single_game)
-
-            return parallel_map(map_function,
-                                candidates, min(8, len(candidates)))
+            g, t = self.games_number, self.tetrominos_in_single_game
+            candidates = list(map(lambda x: (x, g, t), candidates))
+            return parallel_map_fun(candidates)
 
         # many computers many threads
         elif self.fit_type == GeneticAlgorithm.fit_types["socket"]:
-            return self.server.send_data_to_compute(candidates)
+            g, t = self.games_number, self.tetrominos_in_single_game
 
+            candidates = map(Candidate.disable_auto_save, candidates)
+            candidates = list(map(lambda x: (x, g, t), candidates))
+            return self.server.send_data_to_compute(
+                candidates, "multiprocess_map", "parallel_map_fun"
+            )
 
     def _is_end_condition(self) -> bool:
         """test if algorithm can be ended"""
@@ -162,11 +179,12 @@ class GeneticAlgorithm:
                 t4 = Tuple[float, float, float, float]
                 old_par: t4 = self.offsprings[child_id].parameters
                 args: t4 = (
-                    old_par[:insert_index]
-                    + (old_par[insert_index] + mutation,)
-                    + old_par[insert_index + 1:]
+                        old_par[:insert_index]
+                        + (old_par[insert_index] + mutation,)
+                        + old_par[insert_index + 1:]
                 )
-                self.offsprings[child_id] = Candidate(Parameters(*args))
+                self.offsprings[child_id] = \
+                    Candidate(Parameters(*args), auto_save=self.load_files)
 
     def _select_survivors(self):
         """replace worst candidate with offsprings"""
@@ -216,7 +234,8 @@ class GeneticAlgorithm:
         return best_candidate.parameters
 
     def _start_socket(self):
-        self.server = Server('localhost', 55055)
+        self.server = Server(DEFAULT_HOST, DEFAULT_PORT,
+                             self.REQUIRED_DIR, self.REQUIRED_FILES)
         self.server.start_server()
 
     def __enter__(self):

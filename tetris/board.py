@@ -1,5 +1,5 @@
 import numpy as np
-from tetromino import Tetromino
+from .tetromino import Tetromino
 import matplotlib.pyplot as plt
 from typing import List
 

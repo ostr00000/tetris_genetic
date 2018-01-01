@@ -1,4 +1,4 @@
-from board import Board, Tetromino
+from tetris.board import Board, Tetromino
 from typing import Tuple, NamedTuple, Union
 from copy import deepcopy
 

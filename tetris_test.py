@@ -1,8 +1,11 @@
 import unittest
-from board import Board
-from tetromino import Tetromino
-from tetris_ai import TetrisAI, Parameters
-from genetic_algorithm import Fitness, Candidate, GeneticAlgorithm
+from tetris.board import Board
+from tetris.tetromino import Tetromino
+from tetris.tetris_ai import TetrisAI, Parameters
+from candidate import Candidate, Fitness
+from genetic_algorithm import GeneticAlgorithm, DEFAULT_HOST, DEFAULT_PORT
+from python_socket_client_server import client
+from multiprocessing import Process
 
 
 class TetrominoTest(unittest.TestCase):
@@ -268,63 +271,88 @@ class CandidateTest(unittest.TestCase):
 
 class GeneticAlgorithmTest(unittest.TestCase):
     def test_generate_population(self):
-        ga = GeneticAlgorithm(100, games_number=1, tetrominos_in_single_game=1,
-                              offsprings_num=10, load_files=False)
-        self.assertEqual(ga.population, None)
-        ga._generate_population()
-        self.assertEqual(len(ga.population), 100)
+        with GeneticAlgorithm(100, games_number=1, tetrominos_in_single_game=1,
+                              offsprings_num=10, load_files=False) as ga:
+            self.assertEqual(ga.population, None)
+            ga._generate_population()
+            self.assertEqual(len(ga.population), 100)
+
+    @staticmethod
+    def client_work():
+        c = client.Client(DEFAULT_HOST, DEFAULT_PORT)
+        c.start_client()
+
+    def test_fit_all(self):
+        """test all types of fit function"""
+        p = Process(target=self.client_work, name="client")
+
+        for t in GeneticAlgorithm.fit_types.keys():
+            with GeneticAlgorithm(10, offsprings_num=1, fit_type=t,
+                                  parents_num_in_tournament=1,
+                                  games_number=3, load_files=False,
+                                  tetrominos_in_single_game=5) as ga:
+                if t == "socket":
+                    p.start()
+                candidates = ga._fit_all([Candidate() for _ in range(10)])
+
+                self.assertEqual(len(candidates), 10)
+                for candidate in candidates:
+                    self.assertIsNotNone(candidate.fitness)
+
+        p.join()
 
     def test_end_condition(self):
         """genetic algorithm end when all games are won"""
-        ga = GeneticAlgorithm(10, offsprings_num=1,
+        with GeneticAlgorithm(10, offsprings_num=1,
                               parents_num_in_tournament=1,
                               games_number=1, load_files=False,
-                              tetrominos_in_single_game=1)
-        ga._generate_population()
-        ga.population = ga._fit_all(ga.population)
-        self.assertTrue(ga._is_end_condition())
+                              tetrominos_in_single_game=1) as ga:
+            ga._generate_population()
+            ga.population = ga._fit_all(ga.population)
+            self.assertTrue(ga._is_end_condition())
 
-        c: Candidate = ga.population[0]
-        c.fitness = Fitness(0, 0)
-        self.assertFalse(ga._is_end_condition())
+            c: Candidate = ga.population[0]
+            c.fitness = Fitness(0, 0)
+            self.assertFalse(ga._is_end_condition())
 
     def test_create_offsprings(self):
         """new offspring should have parents traits"""
-        ga = GeneticAlgorithm(2, offsprings_num=1,
+        with GeneticAlgorithm(2, offsprings_num=1,
                               parents_num_in_tournament=2,
                               games_number=1, load_files=False,
-                              tetrominos_in_single_game=1)
-        ga.population = [Candidate(Parameters(1, 0, 0, 0)),
-                         Candidate(Parameters(0, 0, 0, 1))]
-        ga.population = ga._fit_all(ga.population)
-        ga._create_offsprings()
-        offspring: Candidate = ga.offsprings[0]
+                              tetrominos_in_single_game=1) as ga:
+            ga.population = [Candidate(Parameters(1, 0, 0, 0)),
+                             Candidate(Parameters(0, 0, 0, 1))]
+            ga.population = ga._fit_all(ga.population)
+            ga._create_offsprings()
+            offspring: Candidate = ga.offsprings[0]
 
-        available = [ga.population[0].parameters,
-                     ga.population[1].parameters,
-                     Candidate(Parameters(1, 0, 0, 1)).parameters]
+            available = [ga.population[0].parameters,
+                         ga.population[1].parameters,
+                         Candidate(Parameters(1, 0, 0, 1)).parameters]
 
-        self.assertIn(offspring.parameters, available)
+            self.assertIn(offspring.parameters, available)
 
     def test_mutate_offsprings(self):
-        ga = GeneticAlgorithm(2, parents_num_in_tournament=1, offsprings_num=1,
+        with GeneticAlgorithm(2, parents_num_in_tournament=1, offsprings_num=1,
                               mutation_chance=1.1, load_files=False,
-                              mutation_max_value=1)
-        original = Candidate(Parameters(1, 1, 1, 1))
-        ga.offsprings = [original]
-        ga._mutate_offsprings()
+                              mutation_max_value=1) as ga:
+            original = Candidate(Parameters(1, 1, 1, 1))
+            ga.offsprings = [original]
+            ga._mutate_offsprings()
 
-        self.assertNotEqual(original.parameters, ga.offsprings[0].parameters)
+            self.assertNotEqual(original.parameters,
+                                ga.offsprings[0].parameters)
 
     def test_parameters_influence(self):
         a = Candidate(Parameters(1, 0, 1, 1))
         b = Candidate(Parameters(-1, 1, -1, -1))
 
-        ga = GeneticAlgorithm(10, offsprings_num=2, games_number=5,
+        with GeneticAlgorithm(10, offsprings_num=2, games_number=5,
                               tetrominos_in_single_game=300, load_files=False,
-                              parents_num_in_tournament=2)
+                              parents_num_in_tournament=2) as ga:
 
-        [a, b] = ga._fit_all([a, b])
+            [a, b] = ga._fit_all([a, b])
 
         self.assertGreaterEqual(b.fitness.won_games, a.fitness.won_games)
         self.assertGreaterEqual(b.fitness.clean_lines, a.fitness.clean_lines)

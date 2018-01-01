@@ -1,6 +1,6 @@
 import uuid
 from math import sqrt
-from tetris_ai import Parameters, TetrisAI
+from tetris.tetris_ai import Parameters, TetrisAI
 from random import uniform
 from typing import NamedTuple
 import pickle
@@ -26,11 +26,13 @@ class Candidate:
         length = sqrt(squares_sum)
         return Parameters(*(x / length for x in parameters))
 
-    def __init__(self, parameters: Parameters = None, fitness: Fitness = None):
+    def __init__(self, parameters: Parameters = None, fitness: Fitness = None,
+                 auto_save=True):
         p = parameters or Parameters(*(uniform(-1, 1) for _ in range(4)))
         self.parameters = Candidate.normalize(p)
         self.fitness = fitness
         self.id = uuid.uuid4()
+        self.auto_save = auto_save
 
     def fit(self, games_number, tetrominos_in_single_game):
         """calculate fitness value"""
@@ -43,7 +45,8 @@ class Candidate:
             total_clean_lines += clean_lines
 
         self.fitness = Fitness(won, total_clean_lines)
-        self.save()
+        if self.auto_save:
+            self.save()
         return self
 
     def __lt__(self, other):
@@ -88,3 +91,8 @@ class Candidate:
         with open(name, "wb") as file:
             pickle.dump(self, file, pickle.DEFAULT_PROTOCOL)
             logger.debug("saved candidate: {}".format(name))
+
+    @staticmethod
+    def disable_auto_save(cls):
+        cls.auto_save = False
+        return cls

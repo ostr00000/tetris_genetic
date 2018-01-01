@@ -18,7 +18,7 @@ def fun(f: Callable[[T], M], q_in, q_out):
         logger.debug("id: {}, status: {}".format(i, str(f_x)))
 
 
-def parallel_map(map_function: Callable[[T], M], x: Iterable[T],
+def parallel_map(map_function: Callable[[T], M], data: Iterable[T],
                  n_process: int = multiprocessing.cpu_count()) -> List[M]:
     q_in = multiprocessing.Queue(1)
     q_out = multiprocessing.Queue()
@@ -32,7 +32,7 @@ def parallel_map(map_function: Callable[[T], M], x: Iterable[T],
         p.daemon = True
         p.start()
 
-    sent = [q_in.put((i, x)) for i, x in enumerate(x)]
+    sent = [q_in.put((i, x)) for i, x in enumerate(data)]
     [q_in.put((None, None)) for _ in range(n_process)]
     res = [q_out.get() for _ in range(len(sent))]
 
