@@ -135,11 +135,14 @@ class GeneticAlgorithm:
         elif self.fit_type == GeneticAlgorithm.fit_types["socket"]:
             g, t = self.games_number, self.tetrominos_in_single_game
 
-            candidates = map(Candidate.disable_auto_save, candidates)
             candidates = list(map(lambda x: (x, g, t), candidates))
-            return self.server.send_data_to_compute(
+            candidates = self.server.send_data_to_compute(
                 candidates, "multiprocess_map", "parallel_map_fun"
             )
+            if self.load_files:
+                for c in candidates:
+                    c.save()
+            return candidates
 
     def _is_end_condition(self) -> bool:
         """test if algorithm can be ended"""
@@ -250,12 +253,13 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     logger.addHandler(logging.FileHandler('./console.log', mode='w'))
 
-    with GeneticAlgorithm(num_of_population=1000,
-                          games_number=100,
-                          tetrominos_in_single_game=500,
-                          parents_num_in_tournament=100,
-                          offsprings_num=300,
+    with GeneticAlgorithm(num_of_population=10,
+                          games_number=10,
+                          tetrominos_in_single_game=50,
+                          parents_num_in_tournament=4,
+                          offsprings_num=2,
                           mutation_chance=0.05,
-                          mutation_max_value=0.2) as ga:
+                          mutation_max_value=0.2,
+                          fit_type="socket") as ga:
         best = ga.find_best_parameters()
         logger.info("best result: {}".format(best))

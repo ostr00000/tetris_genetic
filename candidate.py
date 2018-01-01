@@ -27,7 +27,7 @@ class Candidate:
         return Parameters(*(x / length for x in parameters))
 
     def __init__(self, parameters: Parameters = None, fitness: Fitness = None,
-                 auto_save=True):
+                 auto_save=False):
         p = parameters or Parameters(*(uniform(-1, 1) for _ in range(4)))
         self.parameters = Candidate.normalize(p)
         self.fitness = fitness
@@ -91,8 +91,3 @@ class Candidate:
         with open(name, "wb") as file:
             pickle.dump(self, file, pickle.DEFAULT_PROTOCOL)
             logger.debug("saved candidate: {}".format(name))
-
-    @staticmethod
-    def disable_auto_save(cls):
-        cls.auto_save = False
-        return cls
