@@ -15,5 +15,5 @@ def map_function(candid_games_tetrominos: Tuple[Candidate, int, int]):
 
 
 def parallel_map_fun(candid_game_tetromino: List[Tuple[Candidate, int, int]]):
-    logger.debug("pararell map fun")
+    logger.debug("parallel map fun")
     return parallel_map(map_function, candid_game_tetromino)

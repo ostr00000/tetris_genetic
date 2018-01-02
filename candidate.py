@@ -28,7 +28,8 @@ class Candidate:
 
     def __init__(self, parameters: Parameters = None, fitness: Fitness = None,
                  auto_save=False):
-        p = parameters or Parameters(*(uniform(-1, 1) for _ in range(4)))
+        p = parameters or Parameters(uniform(-1, 0), uniform(0, 1),
+                                     uniform(-1, 0), uniform(-1, 0))
         self.parameters = Candidate.normalize(p)
         self.fitness = fitness
         self.id = uuid.uuid4()
@@ -52,9 +53,9 @@ class Candidate:
     def __lt__(self, other):
         if not isinstance(other, Candidate):
             raise TypeError
-        if self.fitness.clean_lines == other.fitness.clean_lines:
-            return self.fitness.won_games < other.fitness.won_games
-        return self.fitness.clean_lines < other.fitness.clean_lines
+        if self.fitness.won_games == other.fitness.won_games:
+            return self.fitness.clean_lines < other.fitness.clean_lines
+        return self.fitness.won_games < other.fitness.won_games
 
     def crossover(self, other):
         """create new candidate from to parent candidates"""
@@ -72,8 +73,11 @@ class Candidate:
             ret = weight_a * gen_a + weight_b * gen_b
             return ret
 
-        c_param = Parameters(*map(average, self.parameters, other.parameters))
-        return Candidate(c_param)
+        param = list(map(average, self.parameters, other.parameters))
+        param[1] = abs(param[1])
+
+        auto_save = self.auto_save or other.auto_save
+        return Candidate(Parameters(*param), auto_save=auto_save)
 
     def __str__(self):
         ret = ""

@@ -36,6 +36,10 @@ class GeneticAlgorithm:
         "tetris/tetromino.py",
     ]
 
+    @staticmethod
+    def receive_function(c: Candidate):
+        c.save()
+
     def __init__(self,
                  num_of_population: int,
                  games_number: int = 100,
@@ -101,13 +105,15 @@ class GeneticAlgorithm:
         self.population.extend(self._fit_all(new_population))
 
     def _is_saved(self):
+        if not os.path.exists(directory):
+            os.mkdir(directory)
         return self.load_files and os.listdir(directory)
 
     def _load_from_files(self):
         for filename in os.listdir(directory):
             assert filename.endswith(".candidate")
             with open(directory + filename, "rb") as file:
-                candidate = pickle.load(file)
+                candidate: Candidate = pickle.load(file)
                 logger.debug("load candidate: {}".format(filename))
                 self.population.append(candidate)
             if len(self.population) == self.num_of_population:
@@ -134,6 +140,9 @@ class GeneticAlgorithm:
         # many computers many threads
         elif self.fit_type == GeneticAlgorithm.fit_types["socket"]:
             g, t = self.games_number, self.tetrominos_in_single_game
+
+            for c in candidates:
+                c.auto_save = False
 
             candidates = list(map(lambda x: (x, g, t), candidates))
             candidates = self.server.send_data_to_compute(
@@ -182,9 +191,9 @@ class GeneticAlgorithm:
                 t4 = Tuple[float, float, float, float]
                 old_par: t4 = self.offsprings[child_id].parameters
                 args: t4 = (
-                        old_par[:insert_index]
-                        + (old_par[insert_index] + mutation,)
-                        + old_par[insert_index + 1:]
+                    old_par[:insert_index]
+                    + (old_par[insert_index] + mutation,)
+                    + old_par[insert_index + 1:]
                 )
                 self.offsprings[child_id] = \
                     Candidate(Parameters(*args), auto_save=self.load_files)
@@ -238,7 +247,8 @@ class GeneticAlgorithm:
 
     def _start_socket(self):
         self.server = Server(DEFAULT_HOST, DEFAULT_PORT,
-                             self.REQUIRED_DIR, self.REQUIRED_FILES)
+                             self.REQUIRED_DIR, self.REQUIRED_FILES,
+                             GeneticAlgorithm.receive_function)
         self.server.start_server()
 
     def __enter__(self):
@@ -253,13 +263,13 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     logger.addHandler(logging.FileHandler('./console.log', mode='w'))
 
-    with GeneticAlgorithm(num_of_population=10,
-                          games_number=10,
-                          tetrominos_in_single_game=50,
-                          parents_num_in_tournament=4,
-                          offsprings_num=2,
+    with GeneticAlgorithm(num_of_population=100,
+                          games_number=100,
+                          tetrominos_in_single_game=500,
+                          parents_num_in_tournament=10,
+                          offsprings_num=30,
                           mutation_chance=0.05,
                           mutation_max_value=0.2,
-                          fit_type="socket") as ga:
+                          fit_type="multi") as ga:
         best = ga.find_best_parameters()
         logger.info("best result: {}".format(best))
