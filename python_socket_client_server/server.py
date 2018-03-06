@@ -1,7 +1,7 @@
 import itertools
 
 from .connection import *
-from typing import List
+from typing import List, Callable, Any
 import threading
 import os
 import select
@@ -18,7 +18,8 @@ logger.setLevel(logging.DEBUG)
 class Server:
     def __init__(self, host, port,
                  required_dir: List[str],
-                 required_files: List[str]):
+                 required_files: List[str],
+                 receive_function: Callable[[Any], Any] = None):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind((host, port))
         self.sock.listen()
@@ -35,6 +36,8 @@ class Server:
         self.required_files = list(map(
             lambda name: (name, os.stat(name).st_size), required_files
         ))
+
+        self.receive_function = receive_function
 
     def _send_files(self, client):
         send(len(self.required_dir), client)
@@ -148,6 +151,9 @@ class Server:
                     data_to_send = [(i, d) for i, d in data_to_send
                                     if i not in returned_i]
                     ret.extend(returned_data)
+                    if self.receive_function:
+                        for returned_object in returned_data:
+                            self.receive_function(returned_object)
 
                     logger.info("received computed data num: {}"
                                 .format(len(returned_data)))
