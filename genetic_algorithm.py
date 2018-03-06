@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 old_filename = "old.genetic"
 
-DEFAULT_HOST, DEFAULT_PORT = 'localhost', 55055
+DEFAULT_HOST, DEFAULT_PORT = 'localhost', 45054
 
 
 class GeneticAlgorithm:
@@ -101,6 +101,8 @@ class GeneticAlgorithm:
         self.population.extend(self._fit_all(new_population))
 
     def _is_saved(self):
+        if not os.path.exists(directory):
+            os.mkdir(directory)
         return self.load_files and os.listdir(directory)
 
     def _load_from_files(self):

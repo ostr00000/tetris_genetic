@@ -38,7 +38,7 @@ class Client:
     def __init__(self, host, port, directory=DIRECTORY):
         """
         :param host: '127.0.0.1'
-        :param port: 55555
+        :param port: 44444
         :param directory: './downloaded/'
         """
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
